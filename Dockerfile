@@ -16,8 +16,7 @@ RUN apt update && apt install -y libssl-dev ca-certificates
 COPY --from=build /usr/local/cargo/bin/twitch_rss .
 
 ENV ROCKET_ADDRESS=0.0.0.0
-ENV ROCKET_PORT=$PORT
 # ENV TWITCH_CLIENT_ID
 # ENV TWITCH_CLIENT_SECRET
 
-CMD ["./twitch_rss"]
+CMD ROCKET_PORT=$PORT ["./twitch_rss"]
