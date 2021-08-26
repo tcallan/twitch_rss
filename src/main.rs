@@ -144,9 +144,15 @@ fn video_to_rss_item(input: &Video) -> Result<Item, TwitchRssError> {
         .replace("%{width}", "512")
         .replace("%{height}", "288");
 
+    let video_description = if input.description.is_empty() {
+        &input.title
+    } else {
+        &input.description
+    };
+
     let description = format!(
         "<a href=\"{}\"><img src=\"{}\" /></a><br />{}",
-        input.url, thumbnail_url, input.description
+        input.url, thumbnail_url, video_description
     );
 
     ItemBuilder::default()
