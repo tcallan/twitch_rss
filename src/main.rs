@@ -139,30 +139,37 @@ fn video_to_rss_item(input: &Video) -> Result<Item, TwitchRssError> {
 
     let published = input.created_at.to_utc().to_rfc2822();
 
-    let thumbnail_url = input
-        .thumbnail_url
-        .replace("%{width}", "512")
-        .replace("%{height}", "288");
-
-    let video_description = if input.description.is_empty() {
-        &input.title
-    } else {
-        &input.description
-    };
-
-    let description = format!(
-        "<a href=\"{}\"><img src=\"{}\" /></a><br />{}",
-        input.url, thumbnail_url, video_description
-    );
-
     ItemBuilder::default()
         .guid(guid)
         .pub_date(published)
         .title(input.title.clone())
         .link(input.url.clone())
-        .description(description)
+        .description(build_description(input))
         .build()
         .map_err(handle_feed_error)
+}
+
+fn build_description(input: &Video) -> String {
+    let thumbnail_url = input
+        .thumbnail_url
+        .replace("%{width}", "512")
+        .replace("%{height}", "288");
+
+    let mut description = format!(
+        "<a href=\"{}\"><img src=\"{}\" /></a>",
+        input.url, thumbnail_url
+    );
+
+    // include twitch video description if it exists
+    if !input.description.is_empty() {
+        description.push_str("<br />");
+        description.push_str(&input.description);
+    }
+
+    // include video title for buggy RSS readers that only update if the description itself changes
+    description.push_str("<br />");
+    description.push_str(&input.title);
+    description
 }
 
 fn handle_helix_error(err: ClientRequestError<reqwest::Error>) -> TwitchRssError {
