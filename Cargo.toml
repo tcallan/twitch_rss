@@ -10,6 +10,6 @@ edition = "2018"
 tokio = { version = "1.12.0", features = ["rt-multi-thread", "macros"] }
 twitch_api2 = { version = "0.6.0-rc.3", features = ["helix", "reqwest_client", "chrono"] }
 reqwest = "0.11.5"
-cached = "0.25.0"
+cached = "0.25.1"
 rocket = "0.5.0-rc.1"
 rss = "1.10.0"
