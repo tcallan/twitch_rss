@@ -20,7 +20,6 @@ enum TwitchRssError {
     UnknownChannel(String),
     Unauthorized,
     RequestError(String),
-    FeedBuild(String),
 }
 
 impl fmt::Display for TwitchRssError {
@@ -30,7 +29,6 @@ impl fmt::Display for TwitchRssError {
             Self::UnknownChannel(ch) => write!(f, "UnknownChannel({})", ch),
             Self::Unauthorized => write!(f, "Unauthorized"),
             Self::RequestError(e) => write!(f, "RequestError({})", e),
-            Self::FeedBuild(e) => write!(f, "FeedBuild({})", e),
         }
     }
 }
@@ -45,7 +43,6 @@ impl<'r> Responder<'r, 'static> for TwitchRssError {
             Self::UnknownChannel(_) => Status::NotFound,
             Self::Unauthorized => Status::InternalServerError,
             Self::RequestError(_) => Status::InternalServerError,
-            Self::FeedBuild(_) => Status::InternalServerError,
         };
         Response::build()
             .sized_body(err_string.len(), Cursor::new(err_string))
@@ -98,13 +95,12 @@ async fn channel(
     let items = videos
         .iter()
         .map(video_to_rss_item)
-        .collect::<Result<Vec<_>, TwitchRssError>>()?;
+        .collect::<Vec<_>>();
 
     let feed = ChannelBuilder::default()
         .title(format!("{} Twitch VODs", name))
         .items(items)
         .build()
-        .map_err(handle_feed_error)?
         .to_string();
 
     Ok(Xml(feed))
@@ -127,15 +123,10 @@ fn rocket() -> _ {
         .mount("/channel", routes![world, channel])
 }
 
-fn handle_feed_error(err: String) -> TwitchRssError {
-    TwitchRssError::FeedBuild(err)
-}
-
-fn video_to_rss_item(input: &Video) -> Result<Item, TwitchRssError> {
+fn video_to_rss_item(input: &Video) -> Item {
     let guid = GuidBuilder::default()
         .value(input.id.to_string())
-        .build()
-        .map_err(handle_feed_error)?;
+        .build();
 
     let published = input.created_at.to_utc().to_rfc2822();
 
@@ -146,7 +137,6 @@ fn video_to_rss_item(input: &Video) -> Result<Item, TwitchRssError> {
         .link(input.url.clone())
         .description(build_description(input))
         .build()
-        .map_err(handle_feed_error)
 }
 
 fn build_description(input: &Video) -> String {
