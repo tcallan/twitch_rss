@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "1.14.0", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.15.0", features = ["rt-multi-thread", "macros"] }
 twitch_api2 = { version = "0.6.0-rc.3", features = ["helix", "reqwest_client", "chrono"] }
 reqwest = "0.11.7"
 cached = "0.26.2"
