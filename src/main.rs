@@ -92,10 +92,7 @@ async fn channel(
 
     let videos = get_user_videos(&helix_client, &token, user_id).await?;
 
-    let items = videos
-        .iter()
-        .map(video_to_rss_item)
-        .collect::<Vec<_>>();
+    let items = videos.iter().map(video_to_rss_item).collect::<Vec<_>>();
 
     let feed = ChannelBuilder::default()
         .title(format!("{} Twitch VODs", name))
@@ -124,9 +121,7 @@ fn rocket() -> _ {
 }
 
 fn video_to_rss_item(input: &Video) -> Item {
-    let guid = GuidBuilder::default()
-        .value(input.id.to_string())
-        .build();
+    let guid = GuidBuilder::default().value(input.id.to_string()).build();
 
     let published = input.created_at.to_utc().to_rfc2822();
 
@@ -211,7 +206,7 @@ async fn get_user_id(
 
     maybe_channel
         .map(|c| c.broadcaster_id)
-        .ok_or(TwitchRssError::UnknownChannel(user_name.to_string()))
+        .ok_or_else(|| TwitchRssError::UnknownChannel(user_name.to_string()))
 }
 
 #[cached(
