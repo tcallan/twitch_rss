@@ -1,13 +1,11 @@
 use core::fmt;
 use std::env;
-use std::io::Cursor;
 
+use actix_web::http::header::ContentType;
+use actix_web::web::{Data, Path};
+use actix_web::{error, get, App, CustomizeResponder, HttpServer, Responder};
 use cached::proc_macro::cached;
 use reqwest::{Client as ReqwestClient, StatusCode};
-use rocket::http::Status;
-use rocket::response::content::Xml;
-use rocket::response::Responder;
-use rocket::{get, launch, routes, Response, State};
 use rss::{ChannelBuilder, GuidBuilder, Item, ItemBuilder};
 use twitch_api2::helix::videos::{get_videos, Video};
 use twitch_api2::helix::{ClientRequestError, HelixClient, HelixRequestGetError};
@@ -34,61 +32,55 @@ impl fmt::Display for TwitchRssError {
 }
 
 impl std::error::Error for TwitchRssError {}
-
-impl<'r> Responder<'r, 'static> for TwitchRssError {
-    fn respond_to(self, _: &'r rocket::Request<'_>) -> rocket::response::Result<'static> {
-        let err_string = format!("{}", self);
-        let status = match self {
-            Self::Token(_) => Status::InternalServerError,
-            Self::UnknownChannel(_) => Status::NotFound,
-            Self::Unauthorized => Status::InternalServerError,
-            Self::RequestError(_) => Status::InternalServerError,
-        };
-        Response::build()
-            .sized_body(err_string.len(), Cursor::new(err_string))
-            .status(status)
-            .ok()
+impl error::ResponseError for TwitchRssError {
+    fn status_code(&self) -> StatusCode {
+        match self {
+            Self::Token(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::UnknownChannel(_) => StatusCode::NOT_FOUND,
+            Self::Unauthorized => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::RequestError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
     }
 }
 
-#[get("/<name>/id")]
+#[get("/{name}/id")]
 async fn world(
-    name: &str,
-    client: &State<ReqwestClient>,
-    client_id: &State<ClientId>,
-    client_secret: &State<ClientSecret>,
+    name: Path<String>,
+    client: Data<ReqwestClient>,
+    client_id: Data<ClientId>,
+    client_secret: Data<ClientSecret>,
 ) -> Result<String, TwitchRssError> {
     let token = get_token(
-        client.inner(),
-        client_id.inner().clone(),
-        client_secret.inner().clone(),
+        client.get_ref(),
+        client_id.get_ref().clone(),
+        client_secret.get_ref().clone(),
     )
     .await?;
 
-    let helix_client = HelixClient::with_client(client.inner().clone());
+    let helix_client = HelixClient::with_client(client.get_ref().clone());
 
-    let user_id = get_user_id(&helix_client, &token, name.into()).await?;
+    let user_id = get_user_id(&helix_client, &token, name.into_inner().into()).await?;
 
     Ok(format!("{}", user_id))
 }
 
-#[get("/<name>/vod")]
+#[get("/{name}/vod")]
 async fn channel(
-    name: &str,
-    client: &State<ReqwestClient>,
-    client_id: &State<ClientId>,
-    client_secret: &State<ClientSecret>,
-) -> Result<Xml<String>, TwitchRssError> {
+    name: Path<String>,
+    client: Data<ReqwestClient>,
+    client_id: Data<ClientId>,
+    client_secret: Data<ClientSecret>,
+) -> Result<CustomizeResponder<String>, TwitchRssError> {
     let token = get_token(
-        client.inner(),
-        client_id.inner().clone(),
-        client_secret.inner().clone(),
+        client.get_ref(),
+        client_id.get_ref().clone(),
+        client_secret.get_ref().clone(),
     )
     .await?;
 
-    let helix_client = HelixClient::with_client(client.inner().clone());
+    let helix_client = HelixClient::with_client(client.get_ref().clone());
 
-    let user_id = get_user_id(&helix_client, &token, name.into()).await?;
+    let user_id = get_user_id(&helix_client, &token, name.as_str().into()).await?;
 
     let videos = get_user_videos(&helix_client, &token, user_id).await?;
 
@@ -100,24 +92,42 @@ async fn channel(
         .build()
         .to_string();
 
-    Ok(Xml(feed))
+    // TODO: XML responder?
+    let response = feed.customize().insert_header(ContentType::xml());
+
+    Ok(response)
 }
 
-#[launch]
-fn rocket() -> _ {
-    let client = ReqwestClient::new();
-    let client_id: ClientId = env::var("TWITCH_CLIENT_ID")
-        .expect("TWITCH_CLIENT_ID is not set")
-        .into();
-    let client_secret: ClientSecret = env::var("TWITCH_CLIENT_SECRET")
-        .expect("TWITCH_CLIENT_SECRET is not set")
-        .into();
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    let port: u16 = env::var("PORT")
+        .expect("PORT is not set")
+        .parse()
+        .expect("PORT is not a valid value");
 
-    rocket::build()
-        .manage(client)
-        .manage(client_id)
-        .manage(client_secret)
-        .mount("/channel", routes![world, channel])
+    let client = Data::new(ReqwestClient::new());
+    let client_id: Data<ClientId> = Data::new(
+        env::var("TWITCH_CLIENT_ID")
+            .expect("TWITCH_CLIENT_ID is not set")
+            .into(),
+    );
+    let client_secret: Data<ClientSecret> = Data::new(
+        env::var("TWITCH_CLIENT_SECRET")
+            .expect("TWITCH_CLIENT_SECRET is not set")
+            .into(),
+    );
+
+    HttpServer::new(move || {
+        App::new()
+            .app_data(client.clone())
+            .app_data(client_id.clone())
+            .app_data(client_secret.clone())
+            .service(world)
+            .service(channel)
+    })
+    .bind(("0.0.0.0", port))?
+    .run()
+    .await
 }
 
 fn video_to_rss_item(input: &Video) -> Item {
