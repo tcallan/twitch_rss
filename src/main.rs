@@ -5,7 +5,7 @@ use std::io::Cursor;
 use cached::proc_macro::cached;
 use reqwest::{Client as ReqwestClient, StatusCode};
 use rocket::http::Status;
-use rocket::response::content::Xml;
+use rocket::response::content::RawXml;
 use rocket::response::Responder;
 use rocket::{get, launch, routes, Response, State};
 use rss::{ChannelBuilder, GuidBuilder, Item, ItemBuilder};
@@ -78,7 +78,7 @@ async fn channel(
     client: &State<ReqwestClient>,
     client_id: &State<ClientId>,
     client_secret: &State<ClientSecret>,
-) -> Result<Xml<String>, TwitchRssError> {
+) -> Result<RawXml<String>, TwitchRssError> {
     let token = get_token(
         client.inner(),
         client_id.inner().clone(),
@@ -100,7 +100,7 @@ async fn channel(
         .build()
         .to_string();
 
-    Ok(Xml(feed))
+    Ok(RawXml(feed))
 }
 
 #[launch]
