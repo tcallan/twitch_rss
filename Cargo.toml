@@ -10,6 +10,6 @@ edition = "2021"
 tokio = { version = "1.16.1", features = ["rt-multi-thread", "macros"] }
 twitch_api2 = { version = "0.6.0-rc.3", features = ["helix", "reqwest_client", "chrono"] }
 reqwest = "0.11.11"
-cached = "0.38.0"
+cached = "0.39.0"
 rocket = "0.5.0-rc.2"
 rss = "2.0.1"
