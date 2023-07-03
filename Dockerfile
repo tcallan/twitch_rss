@@ -15,7 +15,7 @@ RUN rm /usr/src/twitch_rss/target/release/deps/twitch_rss*
 COPY src ./src
 RUN cargo build --release
 
-FROM debian:buster-slim
+FROM debian:bullseye-slim
 RUN apt update && apt install -y libssl-dev ca-certificates
 COPY --from=build /usr/src/twitch_rss/target/release/twitch_rss .
 
