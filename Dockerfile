@@ -19,8 +19,7 @@ FROM debian:bullseye-slim
 RUN apt update && apt install -y libssl-dev ca-certificates
 COPY --from=build /usr/src/twitch_rss/target/release/twitch_rss .
 
-ENV ROCKET_ADDRESS=0.0.0.0
 # ENV TWITCH_CLIENT_ID
 # ENV TWITCH_CLIENT_SECRET
 
-CMD ROCKET_PORT=$PORT ./twitch_rss
+CMD ./twitch_rss
