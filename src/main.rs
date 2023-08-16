@@ -2,10 +2,10 @@ use core::fmt;
 use std::env;
 use std::net::SocketAddr;
 
-use axum::extract::Path;
+use axum::extract::{Path, State};
 use axum::response::IntoResponse;
 use axum::routing::get;
-use axum::{Extension, Router};
+use axum::Router;
 use cached::proc_macro::cached;
 use reqwest::{Client as ReqwestClient, StatusCode};
 use rss::{ChannelBuilder, GuidBuilder, Item, ItemBuilder};
@@ -63,13 +63,16 @@ impl<T: IntoResponse> IntoResponse for RssXml<T> {
 
 async fn world(
     Path(name): Path<String>,
-    Extension(client): Extension<ReqwestClient>,
-    Extension(client_id): Extension<ClientId>,
-    Extension(client_secret): Extension<ClientSecret>,
+    State(state): State<AppState>,
 ) -> Result<String, TwitchRssError> {
-    let token = get_token(&client, client_id.clone(), client_secret.clone()).await?;
+    let token = get_token(
+        &state.client,
+        state.client_id.clone(),
+        state.client_secret.clone(),
+    )
+    .await?;
 
-    let helix_client = HelixClient::with_client(client.clone());
+    let helix_client = HelixClient::with_client(state.client.clone());
 
     let user_id = get_user_id(&helix_client, &token, name.into()).await?;
 
@@ -78,13 +81,16 @@ async fn world(
 
 async fn channel(
     Path(name): Path<String>,
-    Extension(client): Extension<ReqwestClient>,
-    Extension(client_id): Extension<ClientId>,
-    Extension(client_secret): Extension<ClientSecret>,
+    State(state): State<AppState>,
 ) -> Result<RssXml<String>, TwitchRssError> {
-    let token = get_token(&client, client_id.clone(), client_secret.clone()).await?;
+    let token = get_token(
+        &state.client,
+        state.client_id.clone(),
+        state.client_secret.clone(),
+    )
+    .await?;
 
-    let helix_client = HelixClient::with_client(client.clone());
+    let helix_client = HelixClient::with_client(state.client.clone());
 
     let user_id = get_user_id(&helix_client, &token, name.clone().into()).await?;
 
@@ -116,12 +122,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("TWITCH_CLIENT_SECRET is not set")
         .into();
 
-    let app = Router::new()
+    let channel = Router::new()
         .route("/:name/vod", get(channel))
-        .route("/:name/id", get(world))
-        .layer(Extension(client))
-        .layer(Extension(client_id))
-        .layer(Extension(client_secret));
+        .route("/:name/id", get(world));
+
+    let app = Router::new()
+        .nest("/channel", channel)
+        .with_state(AppState {
+            client,
+            client_id,
+            client_secret,
+        });
 
     let socket = SocketAddr::from(([0, 0, 0, 0], port));
     axum::Server::try_bind(&socket)?
@@ -129,6 +140,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     Ok(())
+}
+
+#[derive(Clone)]
+struct AppState {
+    client: ReqwestClient,
+    client_id: ClientId,
+    client_secret: ClientSecret,
 }
 
 fn video_to_rss_item(input: &Video) -> Item {
