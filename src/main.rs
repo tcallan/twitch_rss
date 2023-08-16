@@ -1,13 +1,13 @@
 use core::fmt;
 use std::env;
-use std::io::Cursor;
+use std::net::SocketAddr;
 
+use axum::extract::{Path, State};
+use axum::response::IntoResponse;
+use axum::routing::get;
+use axum::Router;
 use cached::proc_macro::cached;
 use reqwest::{Client as ReqwestClient, StatusCode};
-use rocket::http::Status;
-use rocket::response::content::RawXml;
-use rocket::response::Responder;
-use rocket::{get, launch, routes, Response, State};
 use rss::{ChannelBuilder, GuidBuilder, Item, ItemBuilder};
 use twitch_api2::helix::videos::{get_videos, Video};
 use twitch_api2::helix::{ClientRequestError, HelixClient, HelixRequestGetError};
@@ -35,60 +35,64 @@ impl fmt::Display for TwitchRssError {
 
 impl std::error::Error for TwitchRssError {}
 
-impl<'r> Responder<'r, 'static> for TwitchRssError {
-    fn respond_to(self, _: &'r rocket::Request<'_>) -> rocket::response::Result<'static> {
+impl IntoResponse for TwitchRssError {
+    fn into_response(self) -> axum::response::Response {
         let err_string = format!("{}", self);
         let status = match self {
-            Self::Token(_) => Status::InternalServerError,
-            Self::UnknownChannel(_) => Status::NotFound,
-            Self::Unauthorized => Status::InternalServerError,
-            Self::RequestError(_) => Status::InternalServerError,
+            Self::Token(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::UnknownChannel(_) => StatusCode::NOT_FOUND,
+            Self::Unauthorized => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::RequestError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
-        Response::build()
-            .sized_body(err_string.len(), Cursor::new(err_string))
-            .status(status)
-            .ok()
+
+        (status, err_string).into_response()
     }
 }
 
-#[get("/<name>/id")]
+struct RssXml<T>(T);
+
+impl<T: IntoResponse> IntoResponse for RssXml<T> {
+    fn into_response(self) -> axum::response::Response {
+        (
+            [(axum::http::header::CONTENT_TYPE, "application/rss+xml")],
+            self.0,
+        )
+            .into_response()
+    }
+}
+
 async fn world(
-    name: &str,
-    client: &State<ReqwestClient>,
-    client_id: &State<ClientId>,
-    client_secret: &State<ClientSecret>,
+    Path(name): Path<String>,
+    State(state): State<AppState>,
 ) -> Result<String, TwitchRssError> {
     let token = get_token(
-        client.inner(),
-        client_id.inner().clone(),
-        client_secret.inner().clone(),
+        &state.client,
+        state.client_id.clone(),
+        state.client_secret.clone(),
     )
     .await?;
 
-    let helix_client = HelixClient::with_client(client.inner().clone());
+    let helix_client = HelixClient::with_client(state.client.clone());
 
     let user_id = get_user_id(&helix_client, &token, name.into()).await?;
 
     Ok(format!("{}", user_id))
 }
 
-#[get("/<name>/vod")]
 async fn channel(
-    name: &str,
-    client: &State<ReqwestClient>,
-    client_id: &State<ClientId>,
-    client_secret: &State<ClientSecret>,
-) -> Result<RawXml<String>, TwitchRssError> {
+    Path(name): Path<String>,
+    State(state): State<AppState>,
+) -> Result<RssXml<String>, TwitchRssError> {
     let token = get_token(
-        client.inner(),
-        client_id.inner().clone(),
-        client_secret.inner().clone(),
+        &state.client,
+        state.client_id.clone(),
+        state.client_secret.clone(),
     )
     .await?;
 
-    let helix_client = HelixClient::with_client(client.inner().clone());
+    let helix_client = HelixClient::with_client(state.client.clone());
 
-    let user_id = get_user_id(&helix_client, &token, name.into()).await?;
+    let user_id = get_user_id(&helix_client, &token, name.clone().into()).await?;
 
     let videos = get_user_videos(&helix_client, &token, user_id).await?;
 
@@ -100,11 +104,16 @@ async fn channel(
         .build()
         .to_string();
 
-    Ok(RawXml(feed))
+    Ok(RssXml(feed))
 }
 
-#[launch]
-fn rocket() -> _ {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let port: u16 = env::var("PORT")
+        .expect("PORT is not set")
+        .parse()
+        .expect("PORT is not a valid value");
+
     let client = ReqwestClient::new();
     let client_id: ClientId = env::var("TWITCH_CLIENT_ID")
         .expect("TWITCH_CLIENT_ID is not set")
@@ -113,11 +122,31 @@ fn rocket() -> _ {
         .expect("TWITCH_CLIENT_SECRET is not set")
         .into();
 
-    rocket::build()
-        .manage(client)
-        .manage(client_id)
-        .manage(client_secret)
-        .mount("/channel", routes![world, channel])
+    let channel = Router::new()
+        .route("/:name/vod", get(channel))
+        .route("/:name/id", get(world));
+
+    let app = Router::new()
+        .nest("/channel", channel)
+        .with_state(AppState {
+            client,
+            client_id,
+            client_secret,
+        });
+
+    let socket = SocketAddr::from(([0, 0, 0, 0], port));
+    axum::Server::try_bind(&socket)?
+        .serve(app.into_make_service())
+        .await?;
+
+    Ok(())
+}
+
+#[derive(Clone)]
+struct AppState {
+    client: ReqwestClient,
+    client_id: ClientId,
+    client_secret: ClientSecret,
 }
 
 fn video_to_rss_item(input: &Video) -> Item {
