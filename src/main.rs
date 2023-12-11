@@ -3,11 +3,12 @@ use std::env;
 use std::net::SocketAddr;
 
 use axum::extract::{Path, State};
+use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::Router;
 use cached::proc_macro::cached;
-use reqwest::{Client as ReqwestClient, StatusCode};
+use reqwest::Client as ReqwestClient;
 use rss::{ChannelBuilder, GuidBuilder, Item, ItemBuilder};
 use twitch_api2::helix::videos::{get_videos, Video};
 use twitch_api2::helix::{ClientRequestError, HelixClient, HelixRequestGetError};
@@ -135,9 +136,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
 
     let socket = SocketAddr::from(([0, 0, 0, 0], port));
-    axum::Server::try_bind(&socket)?
-        .serve(app.into_make_service())
-        .await?;
+    let listener = tokio::net::TcpListener::bind(socket).await?;
+    axum::serve(listener, app).await?;
 
     Ok(())
 }
@@ -190,7 +190,7 @@ fn handle_helix_error(err: ClientRequestError<reqwest::Error>) -> TwitchRssError
     match err {
         ClientRequestError::HelixRequestGetError(HelixRequestGetError::Error {
             status, ..
-        }) if status == StatusCode::UNAUTHORIZED => TwitchRssError::Unauthorized,
+        }) if status == reqwest::StatusCode::UNAUTHORIZED => TwitchRssError::Unauthorized,
         e => TwitchRssError::RequestError(format!("{}", e)),
     }
 }
