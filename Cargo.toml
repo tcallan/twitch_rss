@@ -8,8 +8,8 @@ edition = "2021"
 
 [dependencies]
 axum = "0.7.4"
-tokio = { version = "1.35.1", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.36.0", features = ["rt-multi-thread", "macros"] }
 twitch_api2 = { version = "0.6.0-rc.3", features = ["helix", "reqwest_client", "chrono"] }
-reqwest = "0.11.23"
+reqwest = "0.11.24"
 cached = { version = "0.48.0", features = ["async"] }
 rss = "2.0.7"
