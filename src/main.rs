@@ -152,7 +152,11 @@ struct AppState {
 fn video_to_rss_item(input: &Video) -> Item {
     let guid = GuidBuilder::default().value(input.id.to_string()).build();
 
-    let published = input.created_at.to_utc().to_rfc2822();
+    let published = input
+        .created_at
+        .to_utc()
+        .format(&time::format_description::well_known::Rfc2822)
+        .ok();
 
     ItemBuilder::default()
         .guid(guid)

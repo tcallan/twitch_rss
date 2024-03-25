@@ -9,7 +9,8 @@ edition = "2021"
 [dependencies]
 axum = "0.7.5"
 tokio = { version = "1.36.0", features = ["rt-multi-thread", "macros"] }
-twitch_api2 = { version = "0.6.0-rc.3", features = ["helix", "reqwest_client", "chrono"] }
-reqwest = "0.12.1"
+twitch_api2 = { version = "0.6.1", features = ["helix", "reqwest", "time"] }
+reqwest = "0.11.27" # needs to match what's used by twitch_api2
+time = "0.3.34" # may need to match what's used by twitch_api2
 cached = { version = "0.49.2", features = ["async"] }
 rss = "2.0.7"
