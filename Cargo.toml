@@ -12,5 +12,5 @@ tokio = { version = "1.37.0", features = ["rt-multi-thread", "macros"] }
 twitch_api2 = { version = "0.6.1", features = ["helix", "reqwest", "time"] }
 reqwest = "0.11.27" # needs to match what's used by twitch_api2
 time = "0.3.36" # may need to match what's used by twitch_api2
-cached = { version = "0.50.0", features = ["async"] }
+cached = { version = "0.51.1", features = ["async"] }
 rss = "2.0.7"
