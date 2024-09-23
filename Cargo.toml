@@ -7,7 +7,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum = "0.7.5"
+axum = "0.7.6"
 tokio = { version = "1.40.0", features = ["rt-multi-thread", "macros"] }
 twitch_api2 = { version = "0.6.1", features = ["helix", "reqwest", "time"] }
 reqwest = "0.11.27" # needs to match what's used by twitch_api2
