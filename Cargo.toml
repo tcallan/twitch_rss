@@ -13,4 +13,4 @@ twitch_api2 = { version = "0.6.1", features = ["helix", "reqwest", "time"] }
 reqwest = "0.11.27" # needs to match what's used by twitch_api2
 time = "0.3.37" # may need to match what's used by twitch_api2
 cached = { version = "0.54.0", features = ["async"] }
-rss = "2.0.11"
+rss = "2.0.12"
