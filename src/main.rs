@@ -124,8 +124,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .into();
 
     let channel = Router::new()
-        .route("/:name/vod", get(channel))
-        .route("/:name/id", get(world));
+        .route("/{name}/vod", get(channel))
+        .route("/{name}/id", get(world));
 
     let app = Router::new()
         .nest("/channel", channel)
