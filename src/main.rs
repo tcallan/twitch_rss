@@ -27,10 +27,10 @@ enum TwitchRssError {
 impl fmt::Display for TwitchRssError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
-            Self::Token(e) => write!(f, "Token({})", e),
-            Self::UnknownChannel(ch) => write!(f, "UnknownChannel({})", ch),
+            Self::Token(e) => write!(f, "Token({e})"),
+            Self::UnknownChannel(ch) => write!(f, "UnknownChannel({ch})"),
             Self::Unauthorized => write!(f, "Unauthorized"),
-            Self::RequestError(e) => write!(f, "RequestError({})", e),
+            Self::RequestError(e) => write!(f, "RequestError({e})"),
         }
     }
 }
@@ -39,7 +39,7 @@ impl std::error::Error for TwitchRssError {}
 
 impl IntoResponse for TwitchRssError {
     fn into_response(self) -> axum::response::Response {
-        let err_string = format!("{}", self);
+        let err_string = format!("{self}");
         let status = match self {
             Self::Token(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::UnknownChannel(_) => StatusCode::NOT_FOUND,
@@ -78,7 +78,7 @@ async fn world(
 
     let user_id = get_user_id(&helix_client, &token, name.into()).await?;
 
-    Ok(format!("{}", user_id))
+    Ok(format!("{user_id}"))
 }
 
 async fn channel(
@@ -101,7 +101,7 @@ async fn channel(
     let items = videos.iter().map(video_to_rss_item).collect::<Vec<_>>();
 
     let feed = ChannelBuilder::default()
-        .title(format!("{} Twitch VODs", name))
+        .title(format!("{name} Twitch VODs"))
         .items(items)
         .build()
         .to_string();
@@ -196,7 +196,7 @@ fn handle_helix_error(err: ClientRequestError<reqwest::Error>) -> TwitchRssError
         ClientRequestError::HelixRequestGetError(HelixRequestGetError::Error {
             status, ..
         }) if status == reqwest::StatusCode::UNAUTHORIZED => TwitchRssError::Unauthorized,
-        e => TwitchRssError::RequestError(format!("{}", e)),
+        e => TwitchRssError::RequestError(format!("{e}")),
     }
 }
 
@@ -215,8 +215,8 @@ async fn get_token(
     match AppAccessToken::get_app_access_token(client, client_id, client_secret, vec![]).await {
         Ok(t) => Ok(t),
         Err(e) => {
-            println!("{:?}", e);
-            Err(TwitchRssError::Token(format!("{}", e)))
+            println!("{e:?}");
+            Err(TwitchRssError::Token(format!("{e}")))
         }
     }
 }
@@ -232,7 +232,7 @@ async fn get_user_id(
     token: &AppAccessToken,
     user_name: Nickname,
 ) -> Result<UserId, TwitchRssError> {
-    println!("getting user {}", user_name);
+    println!("getting user {user_name}");
     let maybe_channel = client
         .get_channel_from_login(user_name.clone(), token)
         .await
@@ -254,7 +254,7 @@ async fn get_user_videos(
     token: &AppAccessToken,
     user_id: UserId,
 ) -> Result<Vec<Video>, TwitchRssError> {
-    println!("getting videos for {}", user_id);
+    println!("getting videos for {user_id}");
     let video_request = get_videos::GetVideosRequest::builder()
         .user_id(user_id)
         .build();
