@@ -11,10 +11,10 @@ use axum::Router;
 use cached::proc_macro::cached;
 use reqwest::Client as ReqwestClient;
 use rss::{ChannelBuilder, GuidBuilder, Item, ItemBuilder};
-use twitch_api2::helix::videos::{get_videos, Video};
-use twitch_api2::helix::{ClientRequestError, HelixClient, HelixRequestGetError};
-use twitch_api2::twitch_oauth2::{AppAccessToken, ClientId, ClientSecret};
-use twitch_api2::types::{Nickname, UserId};
+use twitch_api::helix::videos::{get_videos, Video};
+use twitch_api::helix::{ClientRequestError, HelixClient, HelixRequestGetError};
+use twitch_api::twitch_oauth2::{AppAccessToken, ClientId, ClientSecret};
+use twitch_api::types::{UserId, UserName};
 
 #[derive(Debug)]
 enum TwitchRssError {
@@ -153,11 +153,16 @@ struct AppState {
 fn video_to_rss_item(input: &Video) -> Item {
     let guid = GuidBuilder::default().value(input.id.to_string()).build();
 
-    let published = input
-        .created_at
-        .to_utc()
-        .format(&time::format_description::well_known::Rfc2822)
-        .ok();
+    let published = time::OffsetDateTime::parse(
+        input.created_at.as_str(),
+        &time::format_description::well_known::Rfc3339,
+    )
+    .ok()
+    .and_then(|p| {
+        p.to_utc()
+            .format(&time::format_description::well_known::Rfc2822)
+            .ok()
+    });
 
     ItemBuilder::default()
         .guid(guid)
@@ -224,17 +229,17 @@ async fn get_token(
 #[cached(
     time = 600,
     result = true,
-    key = "Nickname",
+    key = "UserName",
     convert = "{ user_name.clone() }"
 )]
 async fn get_user_id(
     client: &HelixClient<'static, ReqwestClient>,
     token: &AppAccessToken,
-    user_name: Nickname,
+    user_name: UserName,
 ) -> Result<UserId, TwitchRssError> {
     println!("getting user {user_name}");
     let maybe_channel = client
-        .get_channel_from_login(user_name.clone(), token)
+        .get_channel_from_login(&user_name, token)
         .await
         .map_err(handle_helix_error)?;
 
@@ -256,7 +261,7 @@ async fn get_user_videos(
 ) -> Result<Vec<Video>, TwitchRssError> {
     println!("getting videos for {user_id}");
     let video_request = get_videos::GetVideosRequest::builder()
-        .user_id(user_id)
+        .user_id(user_id.as_cow())
         .build();
 
     let videos = client
