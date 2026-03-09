@@ -8,7 +8,7 @@ edition = "2021"
 
 [dependencies]
 axum = "0.8.8"
-tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.50.0", features = ["rt-multi-thread", "macros"] }
 twitch_api = { version = "0.7.2", features = ["helix", "reqwest", "typed-builder"] }
 reqwest = "0.12.15" # needs to match what's used by twitch_api
 time = { version = "0.3.47", features = ["parsing", "formatting"] } # may need to match what's used by twitch_api
