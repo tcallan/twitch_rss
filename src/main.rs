@@ -1,14 +1,13 @@
 use core::fmt;
 use std::env;
 use std::net::SocketAddr;
-use std::time::Duration;
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::Router;
-use cached::proc_macro::cached;
+use cached::macros::cached;
 use reqwest::Client as ReqwestClient;
 use rss::{ChannelBuilder, GuidBuilder, Item, ItemBuilder};
 use twitch_api::helix::videos::{get_videos, Video};
@@ -206,7 +205,7 @@ fn handle_helix_error(err: ClientRequestError<reqwest::Error>) -> TwitchRssError
 }
 
 #[cached(
-    time = 1200,
+    ttl = 1200,
     result = true,
     key = "(ClientId, ClientSecret)",
     convert = "{ (client_id.clone(), client_secret.clone()) }"
@@ -227,7 +226,7 @@ async fn get_token(
 }
 
 #[cached(
-    time = 600,
+    ttl = 600,
     result = true,
     key = "UserName",
     convert = "{ user_name.clone() }"
@@ -249,7 +248,7 @@ async fn get_user_id(
 }
 
 #[cached(
-    time = 600,
+    ttl = 600,
     result = true,
     key = "UserId",
     convert = "{ user_id.clone() }"
