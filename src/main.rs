@@ -206,7 +206,6 @@ fn handle_helix_error(err: ClientRequestError<reqwest::Error>) -> TwitchRssError
 
 #[cached(
     ttl = 1200,
-    result = true,
     key = "(ClientId, ClientSecret)",
     convert = "{ (client_id.clone(), client_secret.clone()) }"
 )]
@@ -227,7 +226,6 @@ async fn get_token(
 
 #[cached(
     ttl = 600,
-    result = true,
     key = "UserName",
     convert = "{ user_name.clone() }"
 )]
@@ -249,7 +247,6 @@ async fn get_user_id(
 
 #[cached(
     ttl = 600,
-    result = true,
     key = "UserId",
     convert = "{ user_id.clone() }"
 )]
